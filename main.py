@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import bot_token
+import config
 import logging
 
 handler = logging.basicConfig(level=logging.INFO,
@@ -13,6 +13,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
+class Server():
+    def __init__(self):
+        self.queue = []
+        self.settings = {}
+
+
 # bot = discord.Client(intents=intents)
 bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -20,12 +26,36 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-
-
-@bot.command()
+@bot.hybrid_command()
 async def foo(ctx, arg):
-    print(arg)
     await ctx.send(arg)
 
+@bot.hybrid_command()
+async def ping(ctx):
+    await ctx.send(f"Pong! {int(bot.latency * 1000)}ms")
 
-bot.run(bot_token.token, log_handler=handler)
+@bot.hybrid_command()
+async def about(ctx):
+    await ctx.send("Sah dood. I'm KBot, a Discord music bot by kuelos.")
+
+@bot.command()
+async def sync(ctx):
+    await bot.tree.sync()
+
+
+
+
+
+
+
+
+
+
+
+
+
+def main():
+    bot.run(config.token, log_handler=handler)
+
+
+main()
