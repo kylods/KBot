@@ -41,6 +41,7 @@ if not os.path.exists('downloads'):
 ytdl_opts = {'logger': handler,
              'format': 'bestaudio/bestaudio/best',  # Prioritize 128kbps audio
              'outtmpl': 'downloads/%(title)s.%(ext)s',  # Downloaded files will be saved in a 'downloads' folder
+             'noplaylist': True
 }
 
 ytdl_search_opts = {'logger': handler,
@@ -85,8 +86,8 @@ class Server():
             'skip_percentage': 50,
         }
 
-    def enqueue(self, player):
-        self.queue.append(player)
+    def enqueue(self, title, url):
+        self.queue.append([title, url])
     
     def next_song(self):
         if self.queue:
@@ -176,16 +177,23 @@ def load_server_settings():
 
 # Called when 
 def _play_next_song(ctx):
-    player = servers[ctx.guild.id].next_song()  # Dequeue the song
-    if player:
-        ctx.voice_client.play(player, after=lambda e: song_finished(ctx, e, player))
-        servers[ctx.guild.id].nowplaying = {
-            'title': player.title,
-            'url': player.url,
-            'original_url': player.data['original_url'],
-            'length': timedelta(seconds=player.data.get('duration'))
-        }
-        asyncio.run_coroutine_threadsafe(ctx.send(f"Playing: **{player.title}**"), bot.loop)
+    song_info = servers[ctx.guild.id].next_song()  # Dequeue the song
+    if song_info:
+        title, url = song_info
+        async def play_song():
+            player = await YTDLSource.from_url(url, loop=bot.loop)
+            clen = str(player.data.get('duration')) 
+            player.url += '&range=0-' + clen # This is a workaround for Youtube throttling
+
+            ctx.voice_client.play(player, after=lambda e: song_finished(ctx, e, player))
+            servers[ctx.guild.id].nowplaying = {
+                'title': title,
+                'url': url,
+                'original_url': url,  # Now only storing original url
+                'length': timedelta(seconds=player.data.get('duration'))
+            }
+            await ctx.send(f"Playing: **{title}**")
+        asyncio.run_coroutine_threadsafe(play_song(), bot.loop)
     else:
         # Queue is empty, so clear now playing.
         if ctx.guild.id in servers:
@@ -197,8 +205,7 @@ def song_finished(ctx, error, player):
         print(f"Player error: {error}")
     if servers[ctx.guild.id].settings['loop']:
         async def loop_song():
-            new_player = await YTDLSource.from_url(player.data['original_url'], loop=bot.loop)
-            servers[ctx.guild.id].enqueue(new_player)
+            servers[ctx.guild.id].enqueue(player.title, player.data['original_url'])
             _play_next_song(ctx)
         asyncio.run_coroutine_threadsafe(loop_song(), bot.loop)
         # Play the next song in the queue
@@ -272,7 +279,7 @@ async def leave(ctx):
 
 @bot.hybrid_command()
 async def play(ctx, *, query):
-    """Plays the given Youtube URL"""
+    """Plays the given Youtube URL, or plays the first search result of a query."""
     if not ctx.voice_client:
         success = await ctx.invoke(join)
         if not success:
@@ -293,11 +300,9 @@ async def play(ctx, *, query):
             else:
                 await ctx.send("No results found.")
                 return
-
+        
         player = await YTDLSource.from_url(query, loop=bot.loop)
-        clen = str(player.data.get('duration')) 
-        player.url += '&range=0-' + clen # This is a workaround for Youtube throttling
-        servers[ctx.guild.id].enqueue(player)
+        servers[ctx.guild.id].enqueue(player.title, query)
         
         # Only start playing if the voice client is not currently playing.
         if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
@@ -310,7 +315,7 @@ async def nowplaying(ctx):
     """Displays the currently playing song."""
     if ctx.guild.id in servers and servers[ctx.guild.id].nowplaying:
         np = servers[ctx.guild.id].nowplaying
-        await ctx.send(f"Currently playing: **{np['title']}**\nURL: {np['original_url']}\nLength: {np['length']}")
+        await ctx.send(f"Currently playing: **{np['title']}**\nURL: {np['url']}\nLength: {np['length']}")
     else:
         await ctx.send("No song is currently playing.")
 
