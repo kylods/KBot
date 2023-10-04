@@ -3,6 +3,7 @@ import logging
 import json
 import asyncio
 import random
+import re
 from datetime import timedelta
 
 import discord
@@ -24,24 +25,31 @@ config = load_config()
 token = config["token"]
 default_prefix = config["default_prefix"]
 
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
 handler = logging.basicConfig(level=logging.INFO,
                               format='[%(asctime)s] %(levelname)s:%(name)s: %(message)s', # Formats each log line
                               datefmt='%Y-%m-%d %H:%M:%S', # Custom date/time format for asctime
                               handlers=[logging.StreamHandler(), logging.FileHandler('kbot.log')], # Streamhandler will output to console, FileHandler outputs to kbot.log
                               )
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
 
 ytdl_opts = {'logger': handler,
-             'format': 'bestaudio[abr=128]/bestaudio/best',  # Prioritize 128kbps audio
+             'format': 'bestaudio/bestaudio/best',  # Prioritize 128kbps audio
              'outtmpl': 'downloads/%(title)s.%(ext)s',  # Downloaded files will be saved in a 'downloads' folder
 }
 
+ytdl_search_opts = {'logger': handler,
+                    'quiet': True,
+                    'default_search': 'ytsearch',
+                    'extract_flat': True,
+                    'force_generic_extractor': True,
+}
+ytdl_search = YoutubeDL(ytdl_search_opts)
 ytdl = YoutubeDL(ytdl_opts)
 
 class YTDLSource(discord.PCMVolumeTransformer):
@@ -59,6 +67,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         if 'entries' in data:
             data = data['entries'][0]
 
+        data['original_url'] = url
         filename = ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename), data=data)
 
@@ -128,6 +137,10 @@ class Server():
 # in-memory server database
 servers = {}
 
+def is_url(string):
+    url_pattern = re.compile(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+")
+    return re.match(url_pattern, string) is not None
+
 def get_prefix(bot, message):
     if message.guild:
         if message.guild.id in servers:
@@ -169,6 +182,7 @@ def _play_next_song(ctx):
         servers[ctx.guild.id].nowplaying = {
             'title': player.title,
             'url': player.url,
+            'original_url': player.data['original_url'],
             'length': timedelta(seconds=player.data.get('duration'))
         }
         asyncio.run_coroutine_threadsafe(ctx.send(f"Playing: **{player.title}**"), bot.loop)
@@ -182,9 +196,14 @@ def song_finished(ctx, error, player):
     if error:
         print(f"Player error: {error}")
     if servers[ctx.guild.id].settings['loop']:
-        new_player = YTDLSource.from_url(player.url, loop=bot.loop)
-        servers[ctx.guild.id].enqueue(new_player)
-    _play_next_song(ctx)  # Play the next song in the queue
+        async def loop_song():
+            new_player = await YTDLSource.from_url(player.data['original_url'], loop=bot.loop)
+            servers[ctx.guild.id].enqueue(new_player)
+            _play_next_song(ctx)
+        asyncio.run_coroutine_threadsafe(loop_song(), bot.loop)
+        # Play the next song in the queue
+    else:
+        _play_next_song(ctx)
 
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
@@ -252,7 +271,7 @@ async def leave(ctx):
         await ctx.send('Disconnected.')
 
 @bot.hybrid_command()
-async def play(ctx, url):
+async def play(ctx, *, query):
     """Plays the given Youtube URL"""
     if not ctx.voice_client:
         success = await ctx.invoke(join)
@@ -262,9 +281,22 @@ async def play(ctx, url):
     if ctx.guild.id not in servers:
         servers[ctx.guild.id] = Server()
 
-        player = await YTDLSource.from_url(url, loop=bot.loop)
-        # clen = str(player.data.get('duration'))
-        # player.url += '&range=0-' + clen
+    async with ctx.typing():
+
+        # Check if the query is a URL
+        if not is_url(query):
+            # If it's not a URL, treat it as a search query
+            search_result = ytdl_search.extract_info(f"ytsearch5:{query}", download=False)
+            if search_result and 'entries' in search_result and len(search_result['entries']) > 0:
+                # Get the URL of the first search result
+                query = search_result['entries'][0]['url']
+            else:
+                await ctx.send("No results found.")
+                return
+
+        player = await YTDLSource.from_url(query, loop=bot.loop)
+        clen = str(player.data.get('duration')) 
+        player.url += '&range=0-' + clen # This is a workaround for Youtube throttling
         servers[ctx.guild.id].enqueue(player)
         
         # Only start playing if the voice client is not currently playing.
@@ -273,12 +305,12 @@ async def play(ctx, url):
         else:
             await ctx.send(f"**{player.title}** has been added to the queue!")
 
-@bot.hybrid_command()
+@bot.hybrid_command(aliases=['playing', 'np'])
 async def nowplaying(ctx):
     """Displays the currently playing song."""
     if ctx.guild.id in servers and servers[ctx.guild.id].nowplaying:
         np = servers[ctx.guild.id].nowplaying
-        await ctx.send(f"Currently playing: **{np['title']}**\nURL: {np['url']}\nLength: {np['length']}")
+        await ctx.send(f"Currently playing: **{np['title']}**\nURL: {np['original_url']}\nLength: {np['length']}")
     else:
         await ctx.send("No song is currently playing.")
 
@@ -375,6 +407,38 @@ async def loop(ctx):
     if ctx.guild.id in servers:
         result = servers[ctx.guild.id].toggle_loop()
         await ctx.send(result)
+
+@bot.hybrid_command()
+async def search(ctx, *, query):
+    """Searches YouTube for the given query and returns a list of results."""
+    
+    # Use yt_dlp to search YouTube (this does not download the video)
+    info_extracted = ytdl_search.extract_info(f"ytsearch5:{query}", download=False)
+    if 'entries' not in info_extracted:
+        await ctx.send("Couldn't find any results.")
+        return
+    
+    entries = info_extracted['entries'][:5]
+    results = [f"[{entry['title']}](<{entry['url']}>)" for entry in entries]
+    
+    # Format the results into a message
+    msg = "Please select a song:\n" + "\n".join([f"**{i+1}**. {result}" for i, result in enumerate(results)])
+    message = await ctx.send(msg)
+    
+    # Add number reactions to the message for selection
+    for i in range(len(results)):
+        await message.add_reaction(str(i+1) + "️⃣")
+    
+    def check(reaction, user):
+        return user == ctx.author and str(reaction.emoji)[0] in ["1", "2", "3", "4", "5"] and reaction.message.id == message.id
+
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
+    except asyncio.TimeoutError:
+        await ctx.send("No selection made within 1 minute. Search cancelled.")
+    else:
+        index = int(str(reaction.emoji)[0]) - 1
+        await play(ctx, entries[index]['url'])
 
 def main():
     bot.run(token, log_handler=handler)
