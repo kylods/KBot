@@ -2,3 +2,4 @@ config.json
 kbot.log
 servers/
 downloads/
+__pycache__/
