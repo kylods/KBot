@@ -4,6 +4,7 @@ import json
 import asyncio
 import random
 import re
+import math
 from datetime import timedelta
 
 import discord
@@ -43,13 +44,15 @@ ytdl_opts = {'logger': handler,
              'outtmpl': 'downloads/%(title)s.%(ext)s',  # Downloaded files will be saved in a 'downloads' folder
              'noplaylist': True
 }
-
 ytdl_search_opts = {'logger': handler,
                     'quiet': True,
                     'default_search': 'ytsearch',
                     'extract_flat': True,
                     'force_generic_extractor': True,
+                    'ignoreerrors': True
 }
+
+
 ytdl_search = YoutubeDL(ytdl_search_opts)
 ytdl = YoutubeDL(ytdl_opts)
 
@@ -212,6 +215,22 @@ def song_finished(ctx, error, player):
     else:
         _play_next_song(ctx)
 
+async def extract_playlist_info(playlist_url):
+    # Get playlist info without downloading the videos
+    playlist_info = await bot.loop.run_in_executor(None, lambda: ytdl_search.extract_info(playlist_url, download=False))
+
+    if 'entries' not in playlist_info:
+        return []
+
+    # Extract video titles and URLs from the playlist info, filtering out privated & deleted videos
+    videos = [
+        {'title': entry['title'], 'url': entry['url']}
+        for entry in playlist_info['entries'] 
+        if entry['title'] not in ('[Private video]', '[Deleted video]')
+    ]
+    print(videos)
+    return videos
+
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 @bot.event
@@ -298,9 +317,19 @@ async def play(ctx, *, query):
                 # Get the URL of the first search result
                 query = search_result['entries'][0]['url']
             else:
-                await ctx.send("No results found.")
+                await ctx.send(f"No results found for '{query}.'")
                 return
         
+        if 'playlist?' in query:
+            videos = await extract_playlist_info(query)
+            for video in videos:
+                servers[ctx.guild.id].enqueue(video['title'], video['url'])
+            await ctx.send(f"{len(videos)} videos have been added to the queue!")
+            # If not playing, start the first video in the playlist
+            if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
+                _play_next_song(ctx)
+            return
+
         player = await YTDLSource.from_url(query, loop=bot.loop)
         servers[ctx.guild.id].enqueue(player.title, query)
         
@@ -320,13 +349,20 @@ async def nowplaying(ctx):
         await ctx.send("No song is currently playing.")
 
 @bot.hybrid_command()
-async def queue(ctx):
+async def queue(ctx, page: int = 1):
     """Displays the song queue."""
     if ctx.guild.id in servers and servers[ctx.guild.id].queue:
-        queued_songs = [f"{i+1}. **{song.title}**" for i, song in enumerate(servers[ctx.guild.id].queue)]
-        await ctx.send("Current Queue:\n" + "\n".join(queued_songs))
+        max_pages = math.ceil(len(servers[ctx.guild.id].queue) / 10)
+        if 0 < page <= max_pages:
+            songs_in_page = servers[ctx.guild.id].queue[(page-1) * 10:page * 10]
+        else:
+            page = max_pages
+            songs_in_page = servers[ctx.guild.id].queue[(page-1) * 10:page * 10]
+        queued_songs = [f"{i+1 + (page - 1)*10}. [{song[0]}](<{song[1]}>)" for i, song in enumerate(songs_in_page)]
+        await ctx.send(f"Current Queue: {len(servers[ctx.guild.id].queue)} items.\n" + "\n".join(queued_songs) + f"\nPage {page}/{max_pages}")
     else:
         await ctx.send("The queue is empty.")
+    
 
 @bot.hybrid_command()
 async def pause(ctx):
