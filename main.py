@@ -29,6 +29,7 @@ default_prefix = config["default_prefix"]
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 
 handler = logging.basicConfig(level=logging.INFO,
                               format='[%(asctime)s] %(levelname)s:%(name)s: %(message)s', # Formats each log line
@@ -38,6 +39,9 @@ handler = logging.basicConfig(level=logging.INFO,
 
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
+
+if not os.path.exists('servers'):
+        os.makedirs('servers')
 
 ytdl_opts = {'logger': handler,
              'format': 'bestaudio/bestaudio/best',  # Prioritize 128kbps audio
@@ -76,7 +80,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename), data=data)
 
 class Server():
-    def __init__(self):
+    def __init__(self, guild_id):
+        self.id = guild_id
         self.queue = []
         self.nowplaying = {}
         self.settings = {
@@ -116,9 +121,9 @@ class Server():
             if 0 < index < len(self.queue):
                 promoted_track = self.queue.pop(index)
                 self.queue = [promoted_track] + self.queue
-                return f"Promoted {promoted_track.title} to the top of the queue."
+                return f"Promoted {promoted_track[0]} to the top of the queue."
             elif 0 == index:
-                raise Exception(f"{self.queue[index].title} is already at top of queue.")
+                raise Exception(f"{self.queue[index][0]} is already at top of queue.")
             else:
                 raise Exception("Index is outside of queue range.")
         else:
@@ -134,10 +139,29 @@ class Server():
     def toggle_loop(self):
         if self.settings['loop']:
             self.settings['loop'] = False
+            self.save_settings()
             return "Disabled looping of the queue."
         else:
             self.settings['loop'] = True
+            self.save_settings()
             return "Enabled looping of the queue."
+
+    def set_prefix(self, prefix):
+        self.settings['prefix'] = prefix
+        self.save_settings()
+        return f"Command prefix set to `{prefix}` for this server!"
+
+    def load_settings(self):
+        filename = str(self.id) + '.json'
+        if filename in os.listdir('servers'):
+            file = open(f'servers/{filename}', 'r')
+            self.settings = json.load(file)
+
+    def save_settings(self):
+        filename = str(self.id) + '.json'
+        with open(f'servers/{filename}', 'w') as file:
+            json.dump(self.settings, file)
+
 # in-memory server database
 servers = {}
 
@@ -150,33 +174,6 @@ def get_prefix(bot, message):
         if message.guild.id in servers:
             return servers[message.guild.id].settings.get('prefix')
     return default_prefix
-
-def save_server_settings(guild_id=None):
-    # Save the settings of each server (or a specific server) to individual files.
-    # Args:
-        # guild_id: Optional; the ID of a specific server to save. If not provided, all servers are saved.
-    if not os.path.exists('servers'):
-        os.makedirs('servers')
-
-    if guild_id:  # Save only the specified server
-        with open(f'servers/{guild_id}.json', 'w') as file:
-            json.dump(servers[guild_id].settings, file)
-    else:  # Save all servers
-        for guild_id, server in servers.items():
-            with open(f'servers/{guild_id}.json', 'w') as file:
-                json.dump(server.settings, file)
-
-def load_server_settings():
-    if not os.path.exists('servers'):
-        return
-    
-    for filename in os.listdir('servers'):
-        if filename.endswith('.json'):
-            guild_id = int(filename[:-5])
-            with open(f'servers/{filename}', 'r') as file:
-                if guild_id not in servers:
-                    servers[guild_id] = Server()
-                servers[guild_id].settings = json.load(file)
 
 # Called when 
 def _play_next_song(ctx):
@@ -231,13 +228,24 @@ async def extract_playlist_info(playlist_url):
     print(videos)
     return videos
 
+def initialize_servers():
+    for guild in bot.guilds:
+        servers[guild.id] = Server(guild.id)
+        servers[guild.id].load_settings()
+
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 @bot.event
 async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
     print(f"Logged in as {bot.user}")
-    load_server_settings()
+    initialize_servers()
+
+@bot.event
+async def on_guild_join(guild):
+    if not guild.id in servers:
+        servers[guild.id] = Server(guild.id)
+        servers[guild.id].load_settings()
 
 @bot.hybrid_command()
 async def ping(ctx):
@@ -260,9 +268,8 @@ async def setprefix(ctx, prefix):
         return await ctx.send("This command can only be used in a server.")
     if ctx.guild.id not in servers:
         servers[ctx.guild.id] = Server()
-    servers[ctx.guild.id].settings['prefix'] = prefix
-    save_server_settings(ctx.guild.id)  # Save only the settings of this specific server
-    await ctx.send(f"Prefix set to `{prefix}` for this server!")
+    result = servers[ctx.guild.id].set_prefix(prefix)
+    await ctx.send(result)
 
 @bot.hybrid_command()
 async def join(ctx):
@@ -362,7 +369,6 @@ async def queue(ctx, page: int = 1):
         await ctx.send(f"Current Queue: {len(servers[ctx.guild.id].queue)} items.\n" + "\n".join(queued_songs) + f"\nPage {page}/{max_pages}")
     else:
         await ctx.send("The queue is empty.")
-    
 
 @bot.hybrid_command()
 async def pause(ctx):
