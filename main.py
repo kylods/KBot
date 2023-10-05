@@ -5,8 +5,10 @@ import asyncio
 import random
 import re
 import math
+import requests
 from datetime import timedelta
 
+from youtube_search import YoutubeSearch
 import discord
 from discord.ext import commands
 from yt_dlp import YoutubeDL
@@ -23,8 +25,10 @@ def load_config():
         exit()
 
 config = load_config()
-token = config["token"]
+discord_token = config["discord_token"]
 default_prefix = config["default_prefix"]
+spotify_id = config["spotify_id"]
+spotify_secret = config["spotify_secret"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -52,7 +56,7 @@ ytdl_search_opts = {'logger': handler,
                     'quiet': True,
                     'default_search': 'ytsearch',
                     'extract_flat': True,
-                    'force_generic_extractor': True,
+                    #'force_generic_extractor': True,
                     'ignoreerrors': True
 }
 
@@ -175,11 +179,13 @@ def get_prefix(bot, message):
             return servers[message.guild.id].settings.get('prefix')
     return default_prefix
 
-# Called when 
+# Called when (why is this unfinished)
 def _play_next_song(ctx):
     song_info = servers[ctx.guild.id].next_song()  # Dequeue the song
     if song_info:
         title, url = song_info
+        if 'spotify' in url:
+            url = get_youtube_url(title)
         async def play_song():
             player = await YTDLSource.from_url(url, loop=bot.loop)
             clen = str(player.data.get('duration')) 
@@ -225,11 +231,82 @@ async def extract_playlist_info(playlist_url):
         for entry in playlist_info['entries'] 
         if entry['title'] not in ('[Private video]', '[Deleted video]')
     ]
-    print(videos)
     return videos
+
+def get_spotify_token(client_id, client_secret):
+    """Obtain an access token from Spotify's API."""
+    auth_url = 'https://accounts.spotify.com/api/token'
+
+    # Request based on Client Credentials Flow from Spotify's documentation
+    response = requests.post(auth_url, {
+        'grant_type': 'client_credentials',
+        'client_id': client_id,
+        'client_secret': client_secret,
+    })
+    response_data = response.json()
+    return response_data["access_token"]
+
+def parse_spotify_link(url):
+    token = get_spotify_token(spotify_id, spotify_secret)
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    if "track" in url:
+        # Extract ID from link
+        match = re.search(r"track/(\w+)", url)
+        if not match:
+            raise Exception("Invalid Spotify track link!")
+        track_id = match.group(1)
+
+        # Get track's details from Spotify's API
+        track_url = f"https://api.spotify.com/v1/tracks/{track_id}"
+        response = requests.get(track_url, headers=headers)
+        track_data = response.json()
+
+        artist = track_data['artists'][0]['name']  # We take the name of the first artist
+        title = track_data['name']
+        return [f"{artist}, {title}"]
+    
+    elif "playlist" in url:
+        # Extract playlist ID from link
+        match = re.search(r"playlist/(\w+)", url)
+        if not match:
+            raise Exception("Invalid Spotify playlist link!")
+        playlist_id = match.group(1)
+        
+        # Get tracks from the playlist
+        playlist_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+        response = requests.get(playlist_url, headers=headers)
+        playlist_data = response.json()
+        
+        tracks = []
+        for item in playlist_data['items']:
+            artist = item['track']['artists'][0]['name']
+            title = item['track']['name']
+            tracks.append(f"{artist}, {title}")
+        return tracks
+    
+    else:
+        raise Exception("Invalid Spotify link!")
+
+def get_youtube_url(query):
+    result = YoutubeSearch(query, max_results=1).to_dict()
+    
+    base_url = "https://www.youtube.com/watch?v="
+
+    if result:
+        first_result = result[0]
+        video_url = base_url + first_result["id"]
+        print(f"Searching for '{query}' gives URL: {video_url}")
+        return video_url
+    else:
+        print(f"No results found for '{query}'")
+        return None
 
 def initialize_servers():
     for guild in bot.guilds:
+        print(f"Initializing {guild.name} with id {guild.id}")
         servers[guild.id] = Server(guild.id)
         servers[guild.id].load_settings()
 
@@ -326,8 +403,23 @@ async def play(ctx, *, query):
             else:
                 await ctx.send(f"No results found for '{query}.'")
                 return
-        
-        if 'playlist?' in query:
+        # From here, query should be validated as a URL
+
+        if 'spotify' in query:
+            try:
+                tracks = parse_spotify_link(query)
+                for track in tracks:
+                    servers[ctx.guild.id].enqueue(track, query)
+                await ctx.send(f"{len(tracks)} tracks have been added to the queue!")
+
+                if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
+                    _play_next_song(ctx)
+                return
+            except Exception as e:
+                await ctx.send(e)
+            
+            return
+        elif 'playlist?' in query:
             videos = await extract_playlist_info(query)
             for video in videos:
                 servers[ctx.guild.id].enqueue(video['title'], video['url'])
@@ -485,10 +577,12 @@ async def search(ctx, *, query):
         await ctx.send("No selection made within 1 minute. Search cancelled.")
     else:
         index = int(str(reaction.emoji)[0]) - 1
-        await play(ctx, entries[index]['url'])
+        await play(ctx, query=entries[index]['url'])
+
+
 
 def main():
-    bot.run(token, log_handler=handler)
+    bot.run(discord_token, log_handler=handler)
 
 
 main()
