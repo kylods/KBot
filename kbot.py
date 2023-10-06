@@ -135,7 +135,7 @@ class Server():
                 
     def shuffle_queue(self):
         if self.queue:
-            self.queue = random.shuffle(self.queue)
+            random.shuffle(self.queue)
             return "Queue has been shuffled."
         else:
             raise Exception("Queue is empty.")
