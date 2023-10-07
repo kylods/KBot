@@ -6,6 +6,7 @@ import random
 import re
 import math
 import requests
+import glob
 from datetime import timedelta
 
 from youtube_search import YoutubeSearch
@@ -190,7 +191,6 @@ def _play_next_song(ctx):
             player = await YTDLSource.from_url(url, loop=bot.loop)
             clen = str(player.data.get('duration')) 
             player.url += '&range=0-' + clen # This is a workaround for Youtube throttling
-
             ctx.voice_client.play(player, after=lambda e: song_finished(ctx, e, player))
             servers[ctx.guild.id].nowplaying = {
                 'title': title,
@@ -198,7 +198,7 @@ def _play_next_song(ctx):
                 'original_url': url,  # Now only storing original url
                 'length': timedelta(seconds=player.data.get('duration'))
             }
-            await ctx.send(f"Playing: **{title}**")
+            await ctx.send(f"Playing: **{title}**", delete_after=60, silent=True)
         asyncio.run_coroutine_threadsafe(play_song(), bot.loop)
     else:
         # Queue is empty, so clear now playing.
@@ -207,6 +207,8 @@ def _play_next_song(ctx):
 
 # Called when a song finishes playing
 def song_finished(ctx, error, player):
+    file_cleanup(player.title)
+    player.cleanup()
     if error:
         print(f"Player error: {error}")
     if servers[ctx.guild.id].settings['loop']:
@@ -218,6 +220,12 @@ def song_finished(ctx, error, player):
     else:
         _play_next_song(ctx)
 
+def file_cleanup(filename_base):
+    search_pattern = os.path.join('downloads', f"{filename_base}.*")
+    matching_files = glob.glob(search_pattern)
+
+    for file in matching_files:
+        os.remove(file)
 async def extract_playlist_info(playlist_url):
     # Get playlist info without downloading the videos
     playlist_info = await bot.loop.run_in_executor(None, lambda: ytdl_search.extract_info(playlist_url, download=False))
@@ -384,7 +392,7 @@ async def leave(ctx):
 async def play(ctx, *, query):
     """Plays the given Youtube URL, or plays the first search result of a query."""
     if not ctx.voice_client:
-        success = await ctx.invoke(join)
+        success = await join(ctx)
         if not success:
             return
 
