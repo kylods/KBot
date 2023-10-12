@@ -188,7 +188,7 @@ def get_prefix(bot, message):
 
 def _play_next_song(ctx):
     """Called when a song should start playing. Calls song_finished() when the track finishes playing or is skipped."""
-    song_info = servers[ctx.guild.id].next_song()  # Dequeue the song
+    song_info = servers[ctx.guild.id].next_song()  # Dequeue the next song & return its data
     if song_info:
         title, url = song_info
         if 'spotify' in url:
@@ -390,17 +390,14 @@ async def process_query(ctx, query):
             for track in tracks:
                 servers[ctx.guild.id].enqueue(track, query)
             await ctx.send(f"{len(tracks)} tracks have been added to the queue!")
-            return
         except Exception as e:
             await ctx.send(e)
-        
         return
     elif 'playlist?' in query:
         videos = await extract_playlist_info(query)
         for video in videos:
             servers[ctx.guild.id].enqueue(video['title'], video['url'])
         await ctx.send(f"{len(videos)} videos have been added to the queue!")
-        # If not playing, start the first video in the playlist
         return
 
     # At this point, the url isn't a Spotify link or a Youtube playlist
@@ -622,6 +619,29 @@ async def search(ctx, *, query):
     else:
         index = int(str(reaction.emoji)[0]) - 1
         await play(ctx, query=entries[index]['url'])
+
+@bot.hybrid_command()
+async def stop(ctx):
+    """Clears the queue and removes KBot from the voice channel."""
+    if ctx.guild.id in servers:
+        try:
+            result = servers[ctx.guild.id].remove_from_queue()
+        finally:
+            if ctx.voice_client:
+                if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+                    ctx.voice_client.stop()
+                await ctx.voice_client.disconnect()
+            await ctx.send("Stopped playback.")
+            return
+    
+@bot.hybrid_command()
+async def playnext(ctx, *, query):
+    if 'playlist?' in query or '/playlist/' in query or '/album/' in query:
+        await ctx.send("Only individual tracks can be used with `playnext`")
+        return
+    await process_query(ctx, query)
+    servers[ctx.guild.id].promote(len(servers[ctx.guild.id].queue) - 1)
+
 
 
 
