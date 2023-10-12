@@ -334,14 +334,10 @@ def parse_spotify_link(url):
 
 def get_youtube_url(query):
     """Returns the URL of the first search result of a given Youtube query."""
-    result = YoutubeSearch(query, max_results=1).to_dict()
-    
-    base_url = "https://www.youtube.com/watch?v="
-
-    if result:
-        first_result = result[0]
-        video_url = base_url + first_result["id"]
-        print(f"Searching for '{query}' gives URL: {video_url}")
+    search_result = ytdl_search.extract_info(f"ytsearch5:{query}", download=False)
+    if search_result and 'entries' in search_result and len(search_result['entries']) > 0:
+        # Get the URL of the first search result
+        video_url = search_result['entries'][0]['url']
         return video_url
     else:
         print(f"No results found for '{query}'")
@@ -442,23 +438,18 @@ async def play(ctx, *, query):
             await ctx.send(e)
             return
 
-    if ctx.guild.id not in servers:
-        servers[ctx.guild.id] = Server()
-
     async with ctx.typing():
 
         # Check if the query is a URL
         if not is_url(query):
             # If it's not a URL, treat it as a search query
-            search_result = ytdl_search.extract_info(f"ytsearch5:{query}", download=False)
-            if search_result and 'entries' in search_result and len(search_result['entries']) > 0:
-                # Get the URL of the first search result
-                query = search_result['entries'][0]['url']
+            URL = get_youtube_url(query)
+            if URL:
+                query = URL
             else:
-                await ctx.send(f"No results found for '{query}.'")
-                return
+                ctx.send(f"No results found for {query}")
+            
         # From here, query should be validated as a URL
-
         if 'spotify' in query:
             try:
                 tracks = parse_spotify_link(query)
