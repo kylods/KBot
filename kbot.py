@@ -269,7 +269,7 @@ def get_spotify_token(client_id, client_secret):
     return response_data["access_token"]
 
 def parse_spotify_link(url):
-    """Returns a list of tracks from a given Spotify playlist or track."""
+    """Returns a list of tracks from a given Spotify playlist, album, or track."""
     token = get_spotify_token(spotify_id, spotify_secret)
     headers = {
         "Authorization": f"Bearer {token}"
@@ -307,6 +307,25 @@ def parse_spotify_link(url):
         for item in playlist_data['items']:
             artist = item['track']['artists'][0]['name']
             title = item['track']['name']
+            tracks.append(f"{artist}, {title}")
+        return tracks
+
+    elif "album" in url:
+        # Extract album ID from link
+        match = re.search(r"album/(\w+)", url)
+        if not match:
+            raise Exception("Invalid Spotify album link!")
+        album_id = match.group(1)
+        
+        # Get tracks from the album
+        album_url = f"https://api.spotify.com/v1/albums/{album_id}/tracks"
+        response = requests.get(album_url, headers=headers)
+        album_data = response.json()
+        
+        tracks = []
+        for item in album_data['items']:
+            artist = item['artists'][0]['name']
+            title = item['name']
             tracks.append(f"{artist}, {title}")
         return tracks
 
