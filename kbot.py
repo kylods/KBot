@@ -9,8 +9,6 @@ import requests
 import glob
 from datetime import timedelta
 
-# Should figure out if yt-dlp has functionality that can replace youtube_search
-from youtube_search import YoutubeSearch
 import discord
 from discord.ext import commands
 from yt_dlp import YoutubeDL
@@ -61,8 +59,9 @@ ytdl_search_opts = {'logger': handler,
                     'quiet': True,
                     'default_search': 'ytsearch',
                     'extract_flat': True,
-                    #'force_generic_extractor': True,
-                    'ignoreerrors': True
+                    'force_generic_extractor': True,
+                    'ignoreerrors': True,
+                    'skip_download': True
 }
 
 # Declare ytdl classes
@@ -338,6 +337,7 @@ def get_youtube_url(query):
     if search_result and 'entries' in search_result and len(search_result['entries']) > 0:
         # Get the URL of the first search result
         video_url = search_result['entries'][0]['url']
+        print(f"found url {video_url}")
         return video_url
     else:
         print(f"No results found for '{query}'")
