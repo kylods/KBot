@@ -337,7 +337,6 @@ def get_youtube_url(query):
     if search_result and 'entries' in search_result and len(search_result['entries']) > 0:
         # Get the URL of the first search result
         video_url = search_result['entries'][0]['url']
-        print(f"found url {video_url}")
         return video_url
     else:
         print(f"No results found for '{query}'")
@@ -372,6 +371,42 @@ async def join_voice_channel(ctx):
         return (f"Joined `{channel.name}`!")
     else:
         raise Exception("You are not in a voice channel.")
+
+async def process_query(ctx, query):
+    """Processes a search query or URL in a given context."""
+    # Check if the query is a URL
+    if not is_url(query):
+        # If it's not a URL, treat it as a search query
+        URL = get_youtube_url(query)
+        if URL:
+            query = URL
+        else:
+            ctx.send(f"No results found for {query}")
+        
+    # From here, query should be validated as a URL
+    if 'spotify' in query:
+        try:
+            tracks = parse_spotify_link(query)
+            for track in tracks:
+                servers[ctx.guild.id].enqueue(track, query)
+            await ctx.send(f"{len(tracks)} tracks have been added to the queue!")
+            return
+        except Exception as e:
+            await ctx.send(e)
+        
+        return
+    elif 'playlist?' in query:
+        videos = await extract_playlist_info(query)
+        for video in videos:
+            servers[ctx.guild.id].enqueue(video['title'], video['url'])
+        await ctx.send(f"{len(videos)} videos have been added to the queue!")
+        # If not playing, start the first video in the playlist
+        return
+
+    # At this point, the url isn't a Spotify link or a Youtube playlist
+    player = await YTDLSource.from_url(query, loop=bot.loop)
+    servers[ctx.guild.id].enqueue(player.title, query)
+    await ctx.send(f"**{player.title}** has been added to the queue!")
 
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
@@ -440,48 +475,12 @@ async def play(ctx, *, query):
 
     async with ctx.typing():
 
-        # Check if the query is a URL
-        if not is_url(query):
-            # If it's not a URL, treat it as a search query
-            URL = get_youtube_url(query)
-            if URL:
-                query = URL
-            else:
-                ctx.send(f"No results found for {query}")
-            
-        # From here, query should be validated as a URL
-        if 'spotify' in query:
-            try:
-                tracks = parse_spotify_link(query)
-                for track in tracks:
-                    servers[ctx.guild.id].enqueue(track, query)
-                await ctx.send(f"{len(tracks)} tracks have been added to the queue!")
-
-                if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
-                    _play_next_song(ctx)
-                return
-            except Exception as e:
-                await ctx.send(e)
-            
-            return
-        elif 'playlist?' in query:
-            videos = await extract_playlist_info(query)
-            for video in videos:
-                servers[ctx.guild.id].enqueue(video['title'], video['url'])
-            await ctx.send(f"{len(videos)} videos have been added to the queue!")
-            # If not playing, start the first video in the playlist
-            if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
-                _play_next_song(ctx)
-            return
-
-        player = await YTDLSource.from_url(query, loop=bot.loop)
-        servers[ctx.guild.id].enqueue(player.title, query)
+        await process_query(ctx, query)
         
         # Only start playing if the voice client is not currently playing.
         if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
             _play_next_song(ctx)
-        else:
-            await ctx.send(f"**{player.title}** has been added to the queue!")
+            
 
 @bot.hybrid_command(aliases=['playing', 'np'])
 async def nowplaying(ctx):
