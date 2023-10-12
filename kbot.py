@@ -354,6 +354,29 @@ def initialize_servers():
         servers[guild.id] = Server(guild.id)
         servers[guild.id].load_settings()
 
+async def join_voice_channel(ctx):
+    """Attempts to join a voice channel in the given 'context'.
+    May raise an error with a message that may be sent as a Discord message.
+    Otherwise, returns a string stating it has joined the voice channel."""
+    # Check if the author is in a voice channel
+    if ctx.author.voice and ctx.author.voice.channel:
+        channel = ctx.author.voice.channel
+        permissions = channel.permissions_for(ctx.guild.me)
+        
+        # Check if the bot has the permission to join the voice channel
+        if not permissions.connect:
+            raise Exception(f"I don't have the permissions to join `{channel.name}`.")
+        
+        # Check if the bot is already in a voice channel
+        if ctx.voice_client:
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
+
+        return (f"Joined `{channel.name}`!")
+    else:
+        raise Exception("You are not in a voice channel.")
+
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 
 @bot.event
@@ -395,27 +418,11 @@ async def setprefix(ctx, prefix):
 @bot.hybrid_command()
 async def join(ctx):
     """Joins the user's active voice channel."""
-    # Check if the author is in a voice channel
-    if ctx.author.voice and ctx.author.voice.channel:
-        channel = ctx.author.voice.channel
-        permissions = channel.permissions_for(ctx.guild.me)
-        
-        # Check if the bot has the permission to join the voice channel
-        if not permissions.connect:
-            await ctx.send(f"I don't have the permissions to join `{channel.name}`.")
-            return False
-        
-        # Check if the bot is already in a voice channel
-        if ctx.voice_client:
-            await ctx.voice_client.move_to(channel)
-        else:
-            await channel.connect()
-
-        await ctx.send(f"Joined `{channel.name}`!")
-        return True
-    else:
-        await ctx.send("You are not in a voice channel.")
-        return False
+    try:
+        message = await join_voice_channel(ctx)
+        await ctx.send(message)
+    except Exception as e:
+        await ctx.send(e)
 
 @bot.hybrid_command()
 async def leave(ctx):
@@ -427,9 +434,12 @@ async def leave(ctx):
 @bot.hybrid_command()
 async def play(ctx, *, query):
     """Plays the given Youtube URL, or plays the first search result of a query."""
+    # Attempts to join a voice channel if not already in one. Otherwise, cancel execution.
     if not ctx.voice_client:
-        success = await join(ctx)
-        if not success:
+        try:
+            await join_voice_channel(ctx)
+        except Exception as e:
+            await ctx.send(e)
             return
 
     if ctx.guild.id not in servers:
