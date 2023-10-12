@@ -9,11 +9,13 @@ import requests
 import glob
 from datetime import timedelta
 
+# Should figure out if yt-dlp has functionality that can replace youtube_search
 from youtube_search import YoutubeSearch
 import discord
 from discord.ext import commands
 from yt_dlp import YoutubeDL
 
+# Initializes some global variables for the bot. Tokens, api keys, etc.
 def load_config():
     try:
         with open("config.json", "r") as file:
@@ -36,18 +38,20 @@ intents.message_content = True
 intents.members = True
 intents.guilds = True
 
+# Initialize logger
 handler = logging.basicConfig(level=logging.INFO,
                               format='[%(asctime)s] %(levelname)s:%(name)s: %(message)s', # Formats each log line
                               datefmt='%Y-%m-%d %H:%M:%S', # Custom date/time format for asctime
                               handlers=[logging.StreamHandler(), logging.FileHandler('kbot.log')], # Streamhandler will output to console, FileHandler outputs to kbot.log
                               )
 
+# Initialize ./downloads/ and ./servers/
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
-
 if not os.path.exists('servers'):
         os.makedirs('servers')
 
+# Declaring ytdl search parameters
 ytdl_opts = {'logger': handler,
              'format': 'bestaudio/bestaudio/best',  # Prioritize 128kbps audio
              'outtmpl': 'downloads/%(title)s.%(ext)s',  # Downloaded files will be saved in a 'downloads' folder
@@ -61,7 +65,7 @@ ytdl_search_opts = {'logger': handler,
                     'ignoreerrors': True
 }
 
-
+# Declare ytdl classes
 ytdl_search = YoutubeDL(ytdl_search_opts)
 ytdl = YoutubeDL(ytdl_opts)
 
@@ -170,18 +174,21 @@ class Server():
 # in-memory server database
 servers = {}
 
+
 def is_url(string):
+    """Returns True if the given string is a valid URL."""
     url_pattern = re.compile(r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+")
     return re.match(url_pattern, string) is not None
 
 def get_prefix(bot, message):
+    """Returns a server's set 'prefix', or the bot's default_prefix if the server is not initialized."""
     if message.guild:
         if message.guild.id in servers:
             return servers[message.guild.id].settings.get('prefix')
     return default_prefix
 
-# Called when (why is this unfinished)
 def _play_next_song(ctx):
+    """Called when a song should start playing. Calls song_finished() when the track finishes playing or is skipped."""
     song_info = servers[ctx.guild.id].next_song()  # Dequeue the song
     if song_info:
         title, url = song_info
@@ -205,28 +212,35 @@ def _play_next_song(ctx):
         if ctx.guild.id in servers:
             servers[ctx.guild.id].nowplaying = {}
 
-# Called when a song finishes playing
 def song_finished(ctx, error, player):
-    file_cleanup(player.title)
+    """Called when a song finishes playing"""
+    song_title = player.title
     player.cleanup()
+    file_cleanup(song_title)
     if error:
         print(f"Player error: {error}")
+
+    # Logic for servers who have 'loop' enabled.
     if servers[ctx.guild.id].settings['loop']:
         async def loop_song():
             servers[ctx.guild.id].enqueue(player.title, player.data['original_url'])
             _play_next_song(ctx)
         asyncio.run_coroutine_threadsafe(loop_song(), bot.loop)
-        # Play the next song in the queue
+
     else:
         _play_next_song(ctx)
 
 def file_cleanup(filename_base):
+    """Deletes a played file from ./downloads/.
+    This doesn't always work, perhaps exotic filenames or the file is still being accessed??"""
     search_pattern = os.path.join('downloads', f"{filename_base}.*")
     matching_files = glob.glob(search_pattern)
 
     for file in matching_files:
         os.remove(file)
+
 async def extract_playlist_info(playlist_url):
+    """Returns a list of videos from a given Youtube playlist URL."""
     # Get playlist info without downloading the videos
     playlist_info = await bot.loop.run_in_executor(None, lambda: ytdl_search.extract_info(playlist_url, download=False))
 
@@ -255,6 +269,7 @@ def get_spotify_token(client_id, client_secret):
     return response_data["access_token"]
 
 def parse_spotify_link(url):
+    """Returns a list of tracks from a given Spotify playlist or track."""
     token = get_spotify_token(spotify_id, spotify_secret)
     headers = {
         "Authorization": f"Bearer {token}"
@@ -294,11 +309,12 @@ def parse_spotify_link(url):
             title = item['track']['name']
             tracks.append(f"{artist}, {title}")
         return tracks
-    
+
     else:
         raise Exception("Invalid Spotify link!")
 
 def get_youtube_url(query):
+    """Returns the URL of the first search result of a given Youtube query."""
     result = YoutubeSearch(query, max_results=1).to_dict()
     
     base_url = "https://www.youtube.com/watch?v="
@@ -313,6 +329,7 @@ def get_youtube_url(query):
         return None
 
 def initialize_servers():
+    """Initializes the Discord servers that the bot has access to, then recursively attempts to load each server's settings from './servers/'."""
     for guild in bot.guilds:
         print(f"Initializing {guild.name} with id {guild.id}")
         servers[guild.id] = Server(guild.id)
@@ -528,7 +545,7 @@ async def skip(ctx):
     else:
         ctx.send("Not in a voice channel.")
 
-@bot.hybrid_command(aliases=['playnext'])
+@bot.hybrid_command()
 async def promote(ctx, index):
     """Promotes the chosen index to the top of the queue."""
     if ctx.guild.id in servers:
