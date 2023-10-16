@@ -17,9 +17,25 @@ from yt_dlp import YoutubeDL
 def load_config():
     try:
         with open("config.json", "r") as file:
-            return json.load(file)
+            config = json.load(file)
+            if config["discord_token"] and config["spotify_id"] and config["spotify_secret"]:
+                return config
+            else:
+                print("Config file not complete. Please add your Discord Bot Token & Spotify API info to config.json.")
+                exit()
     except FileNotFoundError:
-        print("Config file not found. Please ensure you have a 'config.json' file.")
+        config_data = {
+            "discord_token": "",
+            "default_prefix": "!",
+            "spotify_id": "",
+            "spotify_secret": ""
+        }
+
+        # Write data to config.json
+        with open('config.json', 'w') as json_file:
+            json.dump(config_data, json_file, indent=4)
+
+        print("Config file not found. Please add your Discord Bot Token & Spotify API info to config.json.")
         exit()
     except json.JSONDecodeError:
         print("Error decoding the config file. Please ensure it's valid JSON.")
@@ -172,7 +188,6 @@ class Server():
 
 # in-memory server database
 servers = {}
-
 
 def is_url(string):
     """Returns True if the given string is a valid URL."""
@@ -646,6 +661,9 @@ async def playnext(ctx, *, query):
 
 
 def main():
+    if not os.path.exists('config.json'):
+        create_config_file()
+        print("config.json created successfully!")
     bot.run(discord_token, log_handler=handler)
 
 
