@@ -18,17 +18,19 @@ def load_config():
     try:
         with open("config.json", "r") as file:
             config = json.load(file)
-            if config["discord_token"] and config["spotify_id"] and config["spotify_secret"]:
-                return config
-            else:
+            if (config["discord_token"] == "YOUR_DISCORD_BOT_TOKEN" or
+                config["spotify_id"] == "YOUR_SPOTIFY_ID" or
+                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET"):
                 print("Config file not complete. Please add your Discord Bot Token & Spotify API info to config.json.")
                 exit()
+            else:
+                return config
     except FileNotFoundError:
         config_data = {
-            "discord_token": "",
+            "discord_token": "YOUR_DISCORD_BOT_TOKEN",
             "default_prefix": "!",
-            "spotify_id": "",
-            "spotify_secret": ""
+            "spotify_id": "YOUR_SPOTIFY_ID",
+            "spotify_secret": "YOUR_SPOTIFY_SECRET"
         }
 
         # Write data to config.json
