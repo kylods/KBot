@@ -53,7 +53,7 @@ intents.members = True
 intents.guilds = True
 
 # Initialize logger
-handler = logging.basicConfig(level=logging.INFO,
+handler = logging.basicConfig(level=logging.WARNING,
                               format='[%(asctime)s] %(levelname)s:%(name)s: %(message)s', # Formats each log line
                               datefmt='%Y-%m-%d %H:%M:%S', # Custom date/time format for asctime
                               handlers=[logging.StreamHandler(), logging.FileHandler('kbot.log')], # Streamhandler will output to console, FileHandler outputs to kbot.log
@@ -661,9 +661,6 @@ async def playnext(ctx, *, query):
 
 
 def main():
-    if not os.path.exists('config.json'):
-        create_config_file()
-        print("config.json created successfully!")
     bot.run(discord_token, log_handler=handler)
 
 
