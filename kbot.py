@@ -432,6 +432,7 @@ async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
     print(f"Logged in as {bot.user}")
     initialize_servers()
+    await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(servers)} servers."))
 
 @bot.event
 async def on_guild_join(guild):
