@@ -368,7 +368,7 @@ def initialize_servers():
 
 async def join_voice_channel(ctx):
     """Attempts to join a voice channel in the given 'context'.
-    May raise an error with a message that may be sent as a Discord message.
+    May raise an error if the author isn't in a voice channel, or if the bot has insufficient permissions to join.
     Otherwise, returns a string stating it has joined the voice channel."""
     # Check if the author is in a voice channel
     if ctx.author.voice and ctx.author.voice.channel:
@@ -484,8 +484,12 @@ async def play(ctx, *, query):
         try:
             await join_voice_channel(ctx)
         except Exception as e:
-            await ctx.send(e)
+            await ctx.send(f"Error: {e}")
             return
+
+    if ctx.voice_client.channel != ctx.author.voice.channel:
+        await ctx.send(f"You are not in the same channel as KBot. 
+                       Currently in {ctx.voice_client.channel}")
 
     async with ctx.typing():
 
