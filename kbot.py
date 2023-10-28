@@ -314,16 +314,19 @@ def parse_spotify_link(url):
             raise Exception("Invalid Spotify playlist link!")
         playlist_id = match.group(1)
         
-        # Get tracks from the playlist
-        playlist_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
-        response = requests.get(playlist_url, headers=headers)
-        playlist_data = response.json()
-        
+        # Get tracks from the playlist, iterating if theres multiple pages
         tracks = []
-        for item in playlist_data['items']:
-            artist = item['track']['artists'][0]['name']
-            title = item['track']['name']
-            tracks.append(f"{artist}, {title}")
+        playlist_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+
+        while playlist_url:
+            response = requests.get(playlist_url, headers=headers)
+            playlist_data = response.json()
+            
+            for item in playlist_data['items']:
+                artist = item['track']['artists'][0]['name']
+                title = item['track']['name']
+                tracks.append(f"{artist}, {title}")
+            playlist_url = playlist_data['next']
         return tracks
 
     elif "album" in url:
@@ -488,8 +491,8 @@ async def play(ctx, *, query):
             return
 
     if ctx.voice_client.channel != ctx.author.voice.channel:
-        await ctx.send(f"You are not in the same channel as KBot. 
-                       Currently in {ctx.voice_client.channel}")
+        await ctx.send(f"You are not in the same channel as KBot. Currently in {ctx.voice_client.channel}")
+        return
 
     async with ctx.typing():
 
