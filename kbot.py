@@ -20,7 +20,8 @@ def load_config():
             config = json.load(file)
             if (config["discord_token"] == "YOUR_DISCORD_BOT_TOKEN" or
                 config["spotify_id"] == "YOUR_SPOTIFY_ID" or
-                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET"):
+                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET" or
+                config["owner_id"] == "YOUR_DISCORD_ID"):
                 print("Config file not complete. Please add your Discord Bot Token & Spotify API info to config.json.")
                 exit()
             else:
@@ -30,7 +31,8 @@ def load_config():
             "discord_token": "YOUR_DISCORD_BOT_TOKEN",
             "default_prefix": "!",
             "spotify_id": "YOUR_SPOTIFY_ID",
-            "spotify_secret": "YOUR_SPOTIFY_SECRET"
+            "spotify_secret": "YOUR_SPOTIFY_SECRET",
+            "owner_id": "YOUR_DISCORD_ID"
         }
 
         # Write data to config.json
