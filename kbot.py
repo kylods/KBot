@@ -20,8 +20,7 @@ def load_config():
             config = json.load(file)
             if (config["discord_token"] == "YOUR_DISCORD_BOT_TOKEN" or
                 config["spotify_id"] == "YOUR_SPOTIFY_ID" or
-                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET" or
-                config["owner_id"] == "YOUR_DISCORD_ID"):
+                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET"):
                 print("Config file not complete. Please add your Discord Bot Token & Spotify API info to config.json.")
                 exit()
             else:
@@ -31,8 +30,7 @@ def load_config():
             "discord_token": "YOUR_DISCORD_BOT_TOKEN",
             "default_prefix": "!",
             "spotify_id": "YOUR_SPOTIFY_ID",
-            "spotify_secret": "YOUR_SPOTIFY_SECRET",
-            "owner_id": "YOUR_DISCORD_ID"
+            "spotify_secret": "YOUR_SPOTIFY_SECRET"
         }
 
         # Write data to config.json
@@ -46,10 +44,6 @@ def load_config():
         exit()
 
 config = load_config()
-discord_token = config["discord_token"]
-default_prefix = config["default_prefix"]
-spotify_id = config["spotify_id"]
-spotify_secret = config["spotify_secret"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -113,7 +107,7 @@ class Server():
         self.queue = []
         self.nowplaying = {}
         self.settings = {
-            'prefix': default_prefix,
+            'prefix': config["default_prefix"],
             'loop': False,
             'vote_skip': True,
             'text_channel': None,
@@ -203,7 +197,7 @@ def get_prefix(bot, message):
     if message.guild:
         if message.guild.id in servers:
             return servers[message.guild.id].settings.get('prefix')
-    return default_prefix
+    return config["default_prefix"]
 
 def _play_next_song(ctx):
     """Called when a song should start playing. Calls song_finished() when the track finishes playing or is skipped."""
@@ -288,7 +282,7 @@ def get_spotify_token(client_id, client_secret):
 
 def parse_spotify_link(url):
     """Returns a list of tracks from a given Spotify playlist, album, or track."""
-    token = get_spotify_token(spotify_id, spotify_secret)
+    token = get_spotify_token(config["spotify_id"], config["spotify_secret"])
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -673,7 +667,7 @@ async def playnext(ctx, *, query):
 
 
 def main():
-    bot.run(discord_token, log_handler=handler)
+    bot.run(config["discord_token"], log_handler=handler)
 
 
 main()
