@@ -57,11 +57,11 @@ handler = logging.basicConfig(level=logging.WARNING,
                               handlers=[logging.StreamHandler(), logging.FileHandler('kbot.log')], # Streamhandler will output to console, FileHandler outputs to kbot.log
                               )
 
-# Initialize ./downloads/ and ./servers/
+# Initialize ./downloads/ and ./bot.server_data/
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
-if not os.path.exists('servers'):
-        os.makedirs('servers')
+if not os.path.exists('bot.server_data'):
+        os.makedirs('bot.server_data')
 
 # Declaring ytdl search parameters
 ytdl_opts = {'logger': handler,
@@ -175,17 +175,14 @@ class Server():
 
     def load_settings(self):
         filename = str(self.id) + '.json'
-        if filename in os.listdir('servers'):
-            file = open(f'servers/{filename}', 'r')
+        if filename in os.listdir('bot.server_data'):
+            file = open(f'bot.server_data/{filename}', 'r')
             self.settings = json.load(file)
 
     def save_settings(self):
         filename = str(self.id) + '.json'
-        with open(f'servers/{filename}', 'w') as file:
+        with open(f'bot.server_data/{filename}', 'w') as file:
             json.dump(self.settings, file)
-
-# in-memory server database
-servers = {}
 
 def is_url(string):
     """Returns True if the given string is a valid URL."""
@@ -195,13 +192,13 @@ def is_url(string):
 def get_prefix(bot, message):
     """Returns a server's set 'prefix', or the bot's default_prefix if the server is not initialized."""
     if message.guild:
-        if message.guild.id in servers:
-            return servers[message.guild.id].settings.get('prefix')
+        if message.guild.id in bot.server_data:
+            return bot.server_data[message.guild.id].settings.get('prefix')
     return config["default_prefix"]
 
 def _play_next_song(ctx):
     """Called when a song should start playing. Calls song_finished() when the track finishes playing or is skipped."""
-    song_info = servers[ctx.guild.id].next_song()  # Dequeue the next song & return its data
+    song_info = bot.server_data[ctx.guild.id].next_song()  # Dequeue the next song & return its data
     if song_info:
         title, url = song_info
         if 'spotify' in url:
@@ -211,7 +208,7 @@ def _play_next_song(ctx):
             clen = str(player.data.get('duration')) 
             player.url += '&range=0-' + clen # This is a workaround for Youtube throttling
             ctx.voice_client.play(player, after=lambda e: song_finished(ctx, e, player))
-            servers[ctx.guild.id].nowplaying = {
+            bot.server_data[ctx.guild.id].nowplaying = {
                 'title': title,
                 'url': url,
                 'original_url': url,  # Now only storing original url
@@ -221,8 +218,8 @@ def _play_next_song(ctx):
         asyncio.run_coroutine_threadsafe(play_song(), bot.loop)
     else:
         # Queue is empty, so clear now playing.
-        if ctx.guild.id in servers:
-            servers[ctx.guild.id].nowplaying = {}
+        if ctx.guild.id in bot.server_data:
+            bot.server_data[ctx.guild.id].nowplaying = {}
 
 def song_finished(ctx, error, player):
     """Called when a song finishes playing"""
@@ -232,10 +229,10 @@ def song_finished(ctx, error, player):
     if error:
         print(f"Player error: {error}")
 
-    # Logic for servers who have 'loop' enabled.
-    if servers[ctx.guild.id].settings['loop']:
+    # Logic for bot.server_data who have 'loop' enabled.
+    if bot.server_data[ctx.guild.id].settings['loop']:
         async def loop_song():
-            servers[ctx.guild.id].enqueue(player.title, player.data['original_url'])
+            bot.server_data[ctx.guild.id].enqueue(player.title, player.data['original_url'])
             _play_next_song(ctx)
         asyncio.run_coroutine_threadsafe(loop_song(), bot.loop)
 
@@ -359,11 +356,11 @@ def get_youtube_url(query):
         return None
 
 def initialize_servers():
-    """Initializes the Discord servers that the bot has access to, then recursively attempts to load each server's settings from './servers/'."""
+    """Initializes the Discord bot.server_data that the bot has access to, then recursively attempts to load each server's settings from './bot.server_data/'."""
     for guild in bot.guilds:
         print(f"Initializing {guild.name} with id {guild.id}")
-        servers[guild.id] = Server(guild.id)
-        servers[guild.id].load_settings()
+        bot.server_data[guild.id] = Server(guild.id)
+        bot.server_data[guild.id].load_settings()
 
 async def join_voice_channel(ctx):
     """Attempts to join a voice channel in the given 'context'.
@@ -404,7 +401,7 @@ async def process_query(ctx, query):
         try:
             tracks = parse_spotify_link(query)
             for track in tracks:
-                servers[ctx.guild.id].enqueue(track, query)
+                bot.server_data[ctx.guild.id].enqueue(track, query)
             await ctx.send(f"{len(tracks)} tracks have been added to the queue!")
         except Exception as e:
             await ctx.send(e)
@@ -412,16 +409,18 @@ async def process_query(ctx, query):
     elif 'playlist?' in query:
         videos = await extract_playlist_info(query)
         for video in videos:
-            servers[ctx.guild.id].enqueue(video['title'], video['url'])
+            bot.server_data[ctx.guild.id].enqueue(video['title'], video['url'])
         await ctx.send(f"{len(videos)} videos have been added to the queue!")
         return
 
     # At this point, the url isn't a Spotify link or a Youtube playlist
     player = await YTDLSource.from_url(query, loop=bot.loop)
-    servers[ctx.guild.id].enqueue(player.title, query)
+    bot.server_data[ctx.guild.id].enqueue(player.title, query)
     await ctx.send(f"**{player.title}** has been added to the queue!")
 
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
+bot.server_data = {}
+
 
 @bot.event
 async def on_ready():
@@ -433,22 +432,22 @@ async def on_ready():
         except Exception as e:
             print(f"Error loading {cog}: {e}")
     initialize_servers()
-    await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(servers)} servers."))
+    await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(bot.server_data)} servers."))
 
 @bot.event
 async def on_guild_join(guild):
-    if not guild.id in servers:
-        servers[guild.id] = Server(guild.id)
-        servers[guild.id].load_settings()
+    if not guild.id in bot.server_data:
+        bot.server_data[guild.id] = Server(guild.id)
+        bot.server_data[guild.id].load_settings()
 
 @bot.hybrid_command()
 async def setprefix(ctx, prefix):
     """Sets the current server's command prefix."""
     if not ctx.message.guild:
         return await ctx.send("This command can only be used in a server.")
-    if ctx.guild.id not in servers:
-        servers[ctx.guild.id] = Server()
-    result = servers[ctx.guild.id].set_prefix(prefix)
+    if ctx.guild.id not in bot.server_data:
+        bot.server_data[ctx.guild.id] = Server()
+    result = bot.server_data[ctx.guild.id].set_prefix(prefix)
     await ctx.send(result)
 
 @bot.hybrid_command()
@@ -494,8 +493,8 @@ async def play(ctx, *, query):
 @bot.hybrid_command(aliases=['playing', 'np'])
 async def nowplaying(ctx):
     """Displays the currently playing song."""
-    if ctx.guild.id in servers and servers[ctx.guild.id].nowplaying:
-        np = servers[ctx.guild.id].nowplaying
+    if ctx.guild.id in bot.server_data and bot.server_data[ctx.guild.id].nowplaying:
+        np = bot.server_data[ctx.guild.id].nowplaying
         await ctx.send(f"Currently playing: **{np['title']}**\nURL: {np['url']}\nLength: {np['length']}")
     else:
         await ctx.send("No song is currently playing.")
@@ -503,15 +502,15 @@ async def nowplaying(ctx):
 @bot.hybrid_command()
 async def queue(ctx, page: int = 1):
     """Displays the song queue."""
-    if ctx.guild.id in servers and servers[ctx.guild.id].queue:
-        max_pages = math.ceil(len(servers[ctx.guild.id].queue) / 10)
+    if ctx.guild.id in bot.server_data and bot.server_data[ctx.guild.id].queue:
+        max_pages = math.ceil(len(bot.server_data[ctx.guild.id].queue) / 10)
         if 0 < page <= max_pages:
-            songs_in_page = servers[ctx.guild.id].queue[(page-1) * 10:page * 10]
+            songs_in_page = bot.server_data[ctx.guild.id].queue[(page-1) * 10:page * 10]
         else:
             page = max_pages
-            songs_in_page = servers[ctx.guild.id].queue[(page-1) * 10:page * 10]
+            songs_in_page = bot.server_data[ctx.guild.id].queue[(page-1) * 10:page * 10]
         queued_songs = [f"{i+1 + (page - 1)*10}. [{song[0]}](<{song[1]}>)" for i, song in enumerate(songs_in_page)]
-        await ctx.send(f"Current Queue: {len(servers[ctx.guild.id].queue)} items.\n" + "\n".join(queued_songs) + f"\nPage {page}/{max_pages}")
+        await ctx.send(f"Current Queue: {len(bot.server_data[ctx.guild.id].queue)} items.\n" + "\n".join(queued_songs) + f"\nPage {page}/{max_pages}")
     else:
         await ctx.send("The queue is empty.")
 
@@ -521,7 +520,7 @@ async def pause(ctx):
     if ctx.voice_client:
         if ctx.voice_client.is_playing():
             await ctx.send("Playback has been paused.")
-            await ctx.voice_client.pause()
+            ctx.voice_client.pause()
         elif ctx.voice_client.is_paused():
             await ctx.send("Playback is already paused.")
         else:
@@ -535,7 +534,7 @@ async def resume(ctx):
     if ctx.voice_client:
         if ctx.voice_client.is_paused():
             await ctx.send("Playback has been resumed.")
-            await ctx.voice_client.resume()
+            ctx.voice_client.resume()
         else:
             await ctx.send("Playback has not been paused.")
     else:
@@ -544,9 +543,9 @@ async def resume(ctx):
 @bot.hybrid_command()
 async def clear(ctx):
     """Clears the current queue."""
-    if ctx.guild.id in servers:
+    if ctx.guild.id in bot.server_data:
         try:
-            result = servers[ctx.guild.id].remove_from_queue()
+            result = bot.server_data[ctx.guild.id].remove_from_queue()
             await ctx.send(result)
         except Exception as e:
             await ctx.send(e)
@@ -554,9 +553,9 @@ async def clear(ctx):
 @bot.hybrid_command()
 async def remove(ctx, index):
     """Removes a song from the queue with the given index."""
-    if ctx.guild.id in servers:
+    if ctx.guild.id in bot.server_data:
         try:
-            result = servers[ctx.guild.id].remove_from_queue(int(index) - 1)
+            result = bot.server_data[ctx.guild.id].remove_from_queue(int(index) - 1)
             await ctx.send(result)
         except Exception as e:
             await ctx.send(e)
@@ -566,7 +565,7 @@ async def skip(ctx):
     """Skips the currently playing track."""
     if ctx.voice_client:
         if ctx.voice_client.is_playing():
-            await ctx.send(f"Skipping {servers[ctx.guild.id].nowplaying['title']}.")
+            await ctx.send(f"Skipping {bot.server_data[ctx.guild.id].nowplaying['title']}.")
             ctx.voice_client.stop()
         else:
             ctx.send("Nothing is being played.")
@@ -576,9 +575,9 @@ async def skip(ctx):
 @bot.hybrid_command()
 async def promote(ctx, index):
     """Promotes the chosen index to the top of the queue."""
-    if ctx.guild.id in servers:
+    if ctx.guild.id in bot.server_data:
         try:
-            result = servers[ctx.guild.id].promote(int(index) - 1)
+            result = bot.server_data[ctx.guild.id].promote(int(index) - 1)
             await ctx.send(result)
         except Exception as e:
             await ctx.send(e)
@@ -586,9 +585,9 @@ async def promote(ctx, index):
 @bot.hybrid_command()
 async def shuffle(ctx):
     """Shuffles the queue."""
-    if ctx.guild.id in servers:
+    if ctx.guild.id in bot.server_data:
         try:
-            result = servers[ctx.guild.id].shuffle_queue()
+            result = bot.server_data[ctx.guild.id].shuffle_queue()
             await ctx.send(result)
         except Exception as e:
             await ctx.send(e)
@@ -596,8 +595,8 @@ async def shuffle(ctx):
 @bot.hybrid_command()
 async def loop(ctx):
     """Toggles looping of the queue."""
-    if ctx.guild.id in servers:
-        result = servers[ctx.guild.id].toggle_loop()
+    if ctx.guild.id in bot.server_data:
+        result = bot.server_data[ctx.guild.id].toggle_loop()
         await ctx.send(result)
 
 @bot.hybrid_command()
@@ -635,9 +634,9 @@ async def search(ctx, *, query):
 @bot.hybrid_command()
 async def stop(ctx):
     """Clears the queue and removes KBot from the voice channel."""
-    if ctx.guild.id in servers:
+    if ctx.guild.id in bot.server_data:
         try:
-            result = servers[ctx.guild.id].remove_from_queue()
+            result = bot.server_data[ctx.guild.id].remove_from_queue()
         finally:
             if ctx.voice_client:
                 if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
@@ -652,7 +651,7 @@ async def playnext(ctx, *, query):
         await ctx.send("Only individual tracks can be used with `playnext`")
         return
     await process_query(ctx, query)
-    servers[ctx.guild.id].promote(len(servers[ctx.guild.id].queue) - 1)
+    bot.server_data[ctx.guild.id].promote(len(bot.server_data[ctx.guild.id].queue) - 1)
 
 
 
