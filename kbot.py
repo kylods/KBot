@@ -427,6 +427,11 @@ bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
     print(f"Logged in as {bot.user}")
+    for cog in ["cogs.general", "cogs.admin"]:
+        try:
+            await bot.load_extension(cog)
+        except Exception as e:
+            print(f"Error loading {cog}: {e}")
     initialize_servers()
     await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(servers)} servers."))
 
@@ -435,20 +440,6 @@ async def on_guild_join(guild):
     if not guild.id in servers:
         servers[guild.id] = Server(guild.id)
         servers[guild.id].load_settings()
-
-@bot.hybrid_command()
-async def ping(ctx):
-    """Returns KBot's latency to Discord."""
-    await ctx.send(f"Pong! {int(bot.latency * 1000)}ms")
-
-@bot.hybrid_command()
-async def about(ctx):
-    """Returns some info about KBot."""
-    await ctx.send("Sah dood. I'm KBot, a Discord music bot by kuelos.")
-
-@bot.command()
-async def sync(ctx):
-    await bot.tree.sync()
 
 @bot.hybrid_command()
 async def setprefix(ctx, prefix):
