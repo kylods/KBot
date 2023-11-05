@@ -153,12 +153,9 @@ def initialize_servers():
         bot.server_data[guild.id] = Server(guild.id)
         bot.server_data[guild.id].load_settings()
 
-
 bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 bot.server_data = {}
 bot.config = config
-bot.handler = handler
-
 
 @bot.event
 async def on_ready():
@@ -179,21 +176,16 @@ async def on_guild_join(guild):
         bot.server_data[guild.id] = Server(guild.id)
         bot.server_data[guild.id].load_settings()
 
-@bot.hybrid_command()
-async def setprefix(ctx, prefix):
-    """Sets the current server's command prefix."""
-    if not ctx.message.guild:
-        return await ctx.send("This command can only be used in a server.")
-    if ctx.guild.id not in bot.server_data:
-        bot.server_data[ctx.guild.id] = Server()
-    result = bot.server_data[ctx.guild.id].set_prefix(prefix)
-    await ctx.send(result)
-
-
-
+@bot.command()
+@bot.is_owner()
+async def reload(self, ctx, extension):
+    try:
+        await self.bot.reload_extension(extension)
+        await ctx.send(f"Reloaded extension `{extension}`")
+    except Exception as e:
+        await ctx.send(f"Failed to reload extension `{extension}`: `{e}`")
 
 def main():
     bot.run(config["discord_token"], log_handler=handler)
-
 
 main()

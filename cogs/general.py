@@ -14,6 +14,14 @@ class General(commands.Cog):
         """Returns some info about KBot."""
         await ctx.send("Sah dood. I'm KBot, a Discord music bot by kuelos.")
 
+    @commands.hybrid_command()
+    async def setprefix(self, ctx, prefix):
+        """Sets the current server's command prefix."""
+        if not ctx.message.guild:
+            return await ctx.send("This command can only be used in a server.")
+        result = self.bot.server_data[ctx.guild.id].set_prefix(prefix)
+        await ctx.send(result)
+
 async def setup(bot):
     print("Loading General extension...")
     await bot.add_cog(General(bot))
