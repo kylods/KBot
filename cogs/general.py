@@ -15,4 +15,5 @@ class General(commands.Cog):
         await ctx.send("Sah dood. I'm KBot, a Discord music bot by kuelos.")
 
 async def setup(bot):
+    print("Loading General extension...")
     await bot.add_cog(General(bot))
