@@ -108,12 +108,7 @@ class Server():
         self.nowplaying = {}
         self.settings = {
             'prefix': config["default_prefix"],
-            'loop': False,
-            'vote_skip': True,
-            'text_channel': None,
-            'voice_channel': None,
-            'dj_role': None,
-            'skip_percentage': 50,
+            'loop': False
         }
 
     def enqueue(self, title, url):
