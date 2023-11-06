@@ -45,6 +45,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.guilds = True
+intents.voice_states = True
 
 # Initialize logger
 handler = logging.basicConfig(level=logging.WARNING,
@@ -89,8 +90,6 @@ class Server():
             else:
                 self.queue = []
                 return "Cleared the queue."
-        else:
-            raise Exception("Queue is empty.")
         
     def promote(self, index):
         if self.queue:
@@ -138,7 +137,6 @@ class Server():
         with open(f'servers/{filename}', 'w') as file:
             json.dump(self.settings, file)
 
-
 def get_prefix(bot, message):
     """Returns a server's set 'prefix', or the bot's default_prefix if the server is not initialized."""
     if message.guild:
@@ -177,10 +175,10 @@ async def on_guild_join(guild):
         bot.server_data[guild.id].load_settings()
 
 @bot.command()
-@bot.is_owner()
-async def reload(self, ctx, extension):
+@commands.is_owner()
+async def reload(ctx, extension):
     try:
-        await self.bot.reload_extension(extension)
+        await bot.reload_extension(extension)
         await ctx.send(f"Reloaded extension `{extension}`")
     except Exception as e:
         await ctx.send(f"Failed to reload extension `{extension}`: `{e}`")

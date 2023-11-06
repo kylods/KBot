@@ -60,7 +60,16 @@ class YTDLSource(discord.PCMVolumeTransformer):
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-    
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if member == self.bot.user:
+            return
+        if before.channel and self.bot.user in before.channel.members:
+            if len(before.channel.members) == 1:
+                await self._stop_playback(member.guild)
+                
+
     @commands.hybrid_command()
     async def join(self, ctx):
         """Joins the user's active voice channel."""
@@ -238,16 +247,10 @@ class Music(commands.Cog):
     @commands.hybrid_command(aliases=['leave'])
     async def stop(self, ctx):
         """Clears the queue and removes KBot from the voice channel."""
-        if ctx.guild.id in self.bot.server_data:
-            try:
-                result = self.bot.server_data[ctx.guild.id].remove_from_queue()
-            finally:
-                if ctx.voice_client:
-                    if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
-                        ctx.voice_client.stop()
-                    await ctx.voice_client.disconnect()
-                await ctx.send("Stopped playback.")
-                return
+        if ctx.voice_client:
+            await self._stop_playback(ctx.guild)
+            await ctx.send("Stopped playback.")
+
         
     @commands.hybrid_command()
     async def playnext(self, ctx, *, query):
@@ -257,6 +260,14 @@ class Music(commands.Cog):
         await self._process_query(ctx, query)
         self.bot.server_data[ctx.guild.id].promote(len(self.bot.server_data[ctx.guild.id].queue) - 1)
 
+    async def _stop_playback(self, guild: discord.Guild):
+        if guild.id in self.bot.server_data:
+            self.bot.server_data[guild.id].remove_from_queue()
+
+        if guild.voice_client:
+            if guild.voice_client.is_playing() or guild.voice_client.is_paused():
+                guild.voice_client.stop()
+            await guild.voice_client.disconnect()
 
     async def _play_next_song(self, ctx):
         """Called when a song should start playing. Calls song_finished() when the track finishes playing or is skipped."""

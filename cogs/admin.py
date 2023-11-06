@@ -16,7 +16,7 @@ class Admin(commands.Cog):
             return  # Don't respond to random commands
 
         if isinstance(error, commands.NotOwner):
-            await ctx.send("Sorry, you are not the owner of this bot!")
+            await ctx.send("This command is reserved for ***High Exarch Kuelos***")
         else:
             await ctx.send(f"An error occurred: `{str(error)}`")
 
