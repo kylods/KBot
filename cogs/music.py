@@ -22,7 +22,8 @@ handler = logging.basicConfig(level=logging.WARNING,
 ytdl_opts = {'logger': handler,
              'format': 'bestaudio/bestaudio/best',  # Prioritize 128kbps audio
              'outtmpl': 'downloads/%(title)s.%(ext)s',  # Downloaded files will be saved in a 'downloads' folder
-             'noplaylist': True
+             'noplaylist': True,
+             'match_filter': lambda info_dict: "Livestream detected" if info_dict.get('is_live') else None,
 }
 ytdl_search_opts = {'logger': handler,
                     'quiet': True,
@@ -30,7 +31,8 @@ ytdl_search_opts = {'logger': handler,
                     'extract_flat': True,
                     'force_generic_extractor': True,
                     'ignoreerrors': True,
-                    'skip_download': True
+                    'skip_download': True,
+                    'match_filter': lambda info_dict: "Livestream detected" if info_dict.get('is_live') else None,
 }
 
 # Declare ytdl classes
