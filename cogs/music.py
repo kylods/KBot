@@ -422,11 +422,11 @@ async def _process_query(ctx, bot, query):
             bot.server_data[ctx.guild.id].enqueue(video['title'], video['url'])
         await ctx.send(f"{len(videos)} videos have been added to the queue!")
         return
-
-    # At this point, the url isn't a Spotify link or a Youtube playlist
-    player = await YTDLSource.from_url(query, loop=bot.loop)
-    bot.server_data[ctx.guild.id].enqueue(player.title, query)
-    await ctx.send(f"**{player.title}** has been added to the queue!")
+    else:
+        # At this point, the url isn't a Spotify link or a Youtube playlist
+        player = await YTDLSource.from_url(query, loop=bot.loop)
+        bot.server_data[ctx.guild.id].enqueue(player.title, query)
+        await ctx.send(f"**{player.title}** has been added to the queue!")
     
 def _is_url(string):
     """Returns True if the given string is a valid URL."""
@@ -451,7 +451,7 @@ async def _song_finished(ctx, bot, error, player):
     if error:
         print(f"Player error: {error}")
 
-    # Logic for bot.server_data who have 'loop' enabled.
+    # Logic for servers who have 'loop' enabled.
     if bot.server_data[ctx.guild.id].settings['loop']:
         async def loop_song():
             bot.server_data[ctx.guild.id].enqueue(player.title, player.data['original_url'])

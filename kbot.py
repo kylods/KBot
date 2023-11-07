@@ -155,6 +155,9 @@ bot = commands.Bot(command_prefix=get_prefix, intents=intents)
 bot.server_data = {}
 bot.config = config
 
+async def update_status():
+    await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(bot.server_data)} servers."))
+
 @bot.event
 async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
@@ -166,13 +169,14 @@ async def on_ready():
             print(f"Failed to load extension {cog}.", file=sys.stderr)
             traceback.print_exc()
     initialize_servers()
-    await bot.change_presence(activity=discord.CustomActivity(name=f"Jukeboxing in {len(bot.server_data)} servers."))
+    await update_status
 
 @bot.event
 async def on_guild_join(guild):
     if not guild.id in bot.server_data:
         bot.server_data[guild.id] = Server(guild.id)
         bot.server_data[guild.id].load_settings()
+    await update_status
 
 @bot.command()
 @commands.is_owner()
