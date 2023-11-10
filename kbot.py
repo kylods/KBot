@@ -84,7 +84,7 @@ class Server():
             if index:
                 if  0 <= index < len(self.queue):
                     removed = self.queue.pop(index)
-                    return f"Removed {removed.title} from the queue"
+                    return f"Removed **{removed[0]}** from the queue."
                 else:
                     raise Exception("Index is outside of queue range.")
             else:
@@ -169,14 +169,14 @@ async def on_ready():
             print(f"Failed to load extension {cog}.", file=sys.stderr)
             traceback.print_exc()
     initialize_servers()
-    await update_status
+    await update_status()
 
 @bot.event
 async def on_guild_join(guild):
     if not guild.id in bot.server_data:
         bot.server_data[guild.id] = Server(guild.id)
         bot.server_data[guild.id].load_settings()
-    await update_status
+    await update_status()
 
 @bot.command()
 @commands.is_owner()
