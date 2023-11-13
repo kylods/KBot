@@ -271,7 +271,47 @@ class Music(commands.Cog):
                 guild.voice_client.stop()
             await guild.voice_client.disconnect()
 
-
+    @commands.hybrid_command()
+    async def jukebox(self, ctx, arg1='', arg2='', arg3=''):
+        """Adds a track or playlist to the server's Jukebox, storing the URL for anyone to easily access."""
+        server = self.bot.server_data[ctx.guild.id]
+        match arg1:
+            case 'add':
+                if arg2 and arg3:
+                    try:
+                        server.add_to_jukebox(arg2, arg3)
+                        await ctx.send(f"Added {arg2} to this server's jukebox!")
+                    except Exception as e:
+                        await ctx.send(f"{e}, {type(arg2)}")
+                else:
+                    await ctx.send("Invalid arguments. `jukebox add <alias> <URL>`")
+            case 'remove':
+                if arg2:
+                    try:
+                        server.remove_from_jukebox(arg2)
+                        await ctx.send(f"Removed {arg2} from this server's jukebox.")
+                    except Exception as e:
+                        await ctx.send(e)
+                else:
+                    await ctx.send("Invalid arguments. `jukebox remove <alias>`")
+            case 'play':
+                if arg2:
+                    jukebox = server.get_jukebox()
+                    if arg2 in jukebox:
+                        await self.play(ctx, query=jukebox[arg2])
+                    else:
+                        await ctx.send(f"'{arg2}' is not defined in this server's jukebox.")
+                else:
+                    await ctx.send("Invalid arguments. `jukebox play <alias>`")
+            case 'list':
+                jukebox = server.get_jukebox()
+                output = f"Playlists in **{ctx.guild.name}**:\n"
+                for alias in jukebox:
+                    output += f"[{alias}]({jukebox[alias]})"
+                await ctx.send(output)
+            case _:
+                await ctx.send("Unknown operator for `jukebox`. Use `jukebox add`, `jukebox remove`, `jukebox play`, or `jukebox list`")
+        
 
 
 async def _extract_playlist_info(bot, playlist_url):

@@ -68,16 +68,12 @@ class Server():
         self.nowplaying = {}
         self.settings = {
             'prefix': config["default_prefix"],
-            'loop': False
+            'loop': False,
+            'playlists': {}
         }
 
     def enqueue(self, title, url):
         self.queue.append([title, url])
-    
-    def next_song(self):
-        if self.queue:
-            return self.queue.pop(0)
-        return None
     
     def remove_from_queue(self, index=None):
         if self.queue:
@@ -90,7 +86,12 @@ class Server():
             else:
                 self.queue = []
                 return "Cleared the queue."
-        
+
+    def next_song(self):
+        if self.queue:
+            return self.queue.pop(0)
+        return None
+
     def promote(self, index):
         if self.queue:
             if 0 < index < len(self.queue):
@@ -110,6 +111,23 @@ class Server():
             return "Queue has been shuffled."
         else:
             raise Exception("Queue is empty.")
+
+    def add_to_jukebox(self, alias, playlist):
+        jukebox = self.get_jukebox()
+        if alias in jukebox:
+            raise Exception(f"{alias} already exists in the Jukebox.")
+        jukebox[alias] = playlist
+        self.save_settings()
+
+    def remove_from_jukebox(self, alias):
+        jukebox = self.get_jukebox()
+        if not alias in jukebox:
+            raise Exception(f"{alias} isn't in the Jukebox.")
+        del jukebox[alias]
+        self.save_settings()
+
+    def get_jukebox(self):
+        return self.settings['playlists']
 
     def toggle_loop(self):
         if self.settings['loop']:
