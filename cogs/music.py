@@ -307,7 +307,7 @@ class Music(commands.Cog):
                 jukebox = server.get_jukebox()
                 output = f"Playlists in **{ctx.guild.name}**:\n"
                 for alias in jukebox:
-                    output += f"[{alias}]({jukebox[alias]})"
+                    output += f"[{alias}]({jukebox[alias]}) "
                 await ctx.send(output)
             case _:
                 await ctx.send("Unknown operator for `jukebox`. Use `jukebox add`, `jukebox remove`, `jukebox play`, or `jukebox list`")
