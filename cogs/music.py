@@ -310,7 +310,7 @@ class Music(commands.Cog):
                     await ctx.send("Jukebox in **{ctx.guild.name}** is empty.")
                     return
                 for alias in jukebox:
-                    output += f"***[{alias}]({jukebox[alias]})***, "
+                    output += f"***[{alias}](<{jukebox[alias]}>)***, "
                 await ctx.send(output[:-2])
             case _:
                 await ctx.send("Unknown operator for `jukebox`. Use `jukebox add`, `jukebox remove`, `jukebox play`, or `jukebox list`")
