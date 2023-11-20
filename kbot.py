@@ -116,6 +116,8 @@ class Server():
         jukebox = self.get_jukebox()
         if alias in jukebox:
             raise Exception(f"{alias} already exists in the Jukebox.")
+        if len(jukebox) >= 9:
+            raise Exception(f"Jukebox is full. *Maximum of 9 playlists.*")
         jukebox[alias] = playlist
         self.save_settings()
 

@@ -282,7 +282,7 @@ class Music(commands.Cog):
                         server.add_to_jukebox(arg2, arg3)
                         await ctx.send(f"Added {arg2} to this server's jukebox!")
                     except Exception as e:
-                        await ctx.send(f"{e}, {type(arg2)}")
+                        await ctx.send(e)
                 else:
                     await ctx.send("Invalid arguments. `jukebox add <alias> <URL>`")
             case 'remove':
@@ -294,26 +294,31 @@ class Music(commands.Cog):
                         await ctx.send(e)
                 else:
                     await ctx.send("Invalid arguments. `jukebox remove <alias>`")
-            case 'play':
-                if arg2:
-                    jukebox = server.get_jukebox()
-                    if arg2 in jukebox:
-                        await self.play(ctx, query=jukebox[arg2])
-                    else:
-                        await ctx.send(f"'{arg2}' is not defined in this server's jukebox.")
-                else:
-                    await ctx.send("Invalid arguments. `jukebox play <alias>`")
-            case 'list':
+            case '':
                 jukebox = server.get_jukebox()
-                output = f"Playlists in **{ctx.guild.name}**:\n"
-                if len(jukebox) == 0:
-                    await ctx.send("Jukebox in **{ctx.guild.name}** is empty.")
-                    return
-                for alias in jukebox:
-                    output += f"***[{alias}](<{jukebox[alias]}>)***, "
-                await ctx.send(output[:-2])
+                playlists = []
+                for key in jukebox:
+                    playlists.append(key)
+                # Format the jukebox list into a message
+                msg = "**Select a playlist:**\n" + "\n".join([f"**{i+1}**. [{key}](<{jukebox[key]}>)" for i, key in enumerate(playlists)])
+                message = await ctx.send(msg, delete_after=60)
+                
+                # Add number reactions to the message for selection
+                for i in range(len(jukebox)):
+                    await message.add_reaction(str(i+1) + "️⃣")
+                
+                def check(reaction, user):
+                    return user == ctx.author and str(reaction.emoji)[0] in ["1", "2", "3", "4", "5", "6", "7", "8", "9"] and reaction.message.id == message.id
+
+                try:
+                    reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
+                except asyncio.TimeoutError:
+                    await ctx.send("No selection made within 1 minute.", delete_after=60)
+                else:
+                    index = int(str(reaction.emoji)[0]) - 1
+                    await self.play(ctx, query=jukebox[playlists[index]])
             case _:
-                await ctx.send("Unknown operator for `jukebox`. Use `jukebox add`, `jukebox remove`, `jukebox play`, or `jukebox list`")
+                await ctx.send("Unknown operator for `jukebox`. Use `jukebox add`, `jukebox remove`, or `jukebox`")
         
 
 
