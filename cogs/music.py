@@ -280,7 +280,7 @@ class Music(commands.Cog):
                 if arg2 and arg3:
                     try:
                         server.add_to_jukebox(arg2, arg3)
-                        await ctx.send(f"Added {arg2} to this server's jukebox!")
+                        await ctx.send(f"Added {arg2} to this server's *jukebox*!")
                     except Exception as e:
                         await ctx.send(e)
                 else:
@@ -289,7 +289,7 @@ class Music(commands.Cog):
                 if arg2:
                     try:
                         server.remove_from_jukebox(arg2)
-                        await ctx.send(f"Removed {arg2} from this server's jukebox.")
+                        await ctx.send(f"Removed {arg2} from this server's *jukebox*.")
                     except Exception as e:
                         await ctx.send(e)
                 else:
@@ -299,6 +299,11 @@ class Music(commands.Cog):
                 playlists = []
                 for key in jukebox:
                     playlists.append(key)
+
+                # Check if there are playlists in jukebox
+                if len(jukebox) == 0:
+                    await ctx.send("This server's *Jukebox* is empty.")
+
                 # Format the jukebox list into a message
                 msg = "**Select a playlist:**\n" + "\n".join([f"**{i+1}**. [{key}](<{jukebox[key]}>)" for i, key in enumerate(playlists)])
                 message = await ctx.send(msg, delete_after=60)
@@ -313,7 +318,7 @@ class Music(commands.Cog):
                 try:
                     reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
                 except asyncio.TimeoutError:
-                    await ctx.send("No selection made within 1 minute.", delete_after=60)
+                    await ctx.send("No selection made.", delete_after=60)
                 else:
                     index = int(str(reaction.emoji)[0]) - 1
                     await self.play(ctx, query=jukebox[playlists[index]])
