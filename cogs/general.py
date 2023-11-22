@@ -1,3 +1,4 @@
+import discord
 from discord.ext import commands
 
 class General(commands.Cog):
@@ -12,7 +13,15 @@ class General(commands.Cog):
     @commands.hybrid_command()
     async def about(self, ctx):
         """Returns some info about KBot."""
-        await ctx.send("Sah dood. I'm KBot, a Discord music bot by kuelos.")
+
+        aboutEmbed = discord.Embed(
+            title="KBot",
+            description="An open-source streaming bot written in Discord.py.\n\nNeed help? Contact kuelos on Discord.",
+            url="https://github.com/kylods/kBot",
+            color=0x104E8B
+            )
+
+        await ctx.send(embed=aboutEmbed)
 
     @commands.hybrid_command()
     async def setprefix(self, ctx, prefix):

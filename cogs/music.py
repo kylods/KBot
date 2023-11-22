@@ -256,6 +256,7 @@ class Music(commands.Cog):
         
     @commands.hybrid_command()
     async def playnext(self, ctx, *, query):
+        """Adds a song to the top of the queue."""
         if 'playlist?' in query or '/playlist/' in query or '/album/' in query:
             await ctx.send("Only individual tracks can be used with `playnext`")
             return
