@@ -58,7 +58,7 @@ handler = logging.basicConfig(level=logging.WARNING,
 if not os.path.exists('downloads'):
     os.makedirs('downloads')
 if not os.path.exists('servers'):
-        os.makedirs('bot.server_data')
+        os.makedirs('servers')
 
 
 class Server():
