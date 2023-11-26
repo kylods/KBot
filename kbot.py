@@ -4,6 +4,7 @@ import json
 import random
 import sys
 import traceback
+from dotenv import load_dotenv
 
 import discord
 from discord.ext import commands
@@ -11,36 +12,27 @@ from discord.ext import commands
 
 # Initializes some global variables for the bot. Tokens, api keys, etc.
 def load_config():
-    try:
-        with open("config.json", "r") as file:
-            config = json.load(file)
-            if (config["discord_token"] == "YOUR_DISCORD_BOT_TOKEN" or
-                config["spotify_id"] == "YOUR_SPOTIFY_ID" or
-                config["spotify_secret"] == "YOUR_SPOTIFY_SECRET"):
-                print("Config file not complete. Please add your Discord Bot Token & Spotify API info to config.json.")
-                exit()
-            else:
-                return config
-    except FileNotFoundError:
-        config_data = {
-            "discord_token": "YOUR_DISCORD_BOT_TOKEN",
-            "default_prefix": "!",
-            "spotify_id": "YOUR_SPOTIFY_ID",
-            "spotify_secret": "YOUR_SPOTIFY_SECRET"
-        }
+    config = {
+        'discord_token': os.environ.get('DISCORD_TOKEN'),
+        'default_prefix': os.environ.get('DEFAULT_PREFIX'),
+        'spotify_id': os.environ.get('SPOTIFY_ID'),
+        'spotify_secret': os.environ.get('SPOTIFY_SECRET')
+    }
 
-        # Write data to config.json
-        with open('config.json', 'w') as json_file:
-            json.dump(config_data, json_file, indent=4)
-
-        print("Config file not found. Please add your Discord Bot Token & Spotify API info to config.json.")
-        exit()
-    except json.JSONDecodeError:
-        print("Error decoding the config file. Please ensure it's valid JSON.")
+    if (not config['default_prefix'] or
+    not config['discord_token'] or
+    not config['spotify_id'] or
+    not config['spotify_secret']):
+        print("Environment variable(s) empty.")
         exit()
 
+    return config
+        
+# Loads the .env environment variables, if it exists, then initializes the config dictionary
+load_dotenv()
 config = load_config()
 
+# Initializes the intents for Discord to login with
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
