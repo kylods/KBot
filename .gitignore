@@ -1,6 +1,6 @@
-config.json
 kbot.log
 servers/
 downloads/
 __pycache__/
 CHANGELOG.md
+.env
