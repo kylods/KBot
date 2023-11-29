@@ -566,4 +566,11 @@ async def _play_next_song(ctx, bot):
 
 async def setup(bot):
     print("Loading Music extension...")
+
+    # Initialize Spotify API variables
+    bot.config["spotify_id"] = os.environ.get('SPOTIFY_ID')
+    bot.config["spotify_secret"] = os.environ.get('SPOTIFY_SECRET')
+
+    if (not bot.config['spotify_id'] or not bot.config['spotify_secret']):
+        raise Exception("spotify_id or spotify_secret empty")
     await bot.add_cog(Music(bot))

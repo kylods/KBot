@@ -15,14 +15,11 @@ def load_config():
     config = {
         'discord_token': os.environ.get('DISCORD_TOKEN'),
         'default_prefix': os.environ.get('DEFAULT_PREFIX'),
-        'spotify_id': os.environ.get('SPOTIFY_ID'),
-        'spotify_secret': os.environ.get('SPOTIFY_SECRET')
+        
     }
 
     if (not config['default_prefix'] or
-    not config['discord_token'] or
-    not config['spotify_id'] or
-    not config['spotify_secret']):
+    not config['discord_token']):
         print("Environment variable(s) empty.")
         exit()
 
