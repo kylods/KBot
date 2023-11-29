@@ -53,82 +53,13 @@ if not os.path.exists('servers'):
 class Server():
     def __init__(self, guild_id):
         self.id = guild_id
-        self.queue = []
-        self.nowplaying = {}
+        # The 'settings' dict can also be used to hold data from other modules, and is directly accessed.
         self.settings = {
             'prefix': config["default_prefix"],
             'loop': False,
             'playlists': {}
         }
-
-    def enqueue(self, title, url):
-        self.queue.append([title, url])
-    
-    def remove_from_queue(self, index=None):
-        if self.queue:
-            if index:
-                if  0 <= index < len(self.queue):
-                    removed = self.queue.pop(index)
-                    return f"Removed **{removed[0]}** from the queue."
-                else:
-                    raise Exception("Index is outside of queue range.")
-            else:
-                self.queue = []
-                return "Cleared the queue."
-
-    def next_song(self):
-        if self.queue:
-            return self.queue.pop(0)
-        return None
-
-    def promote(self, index):
-        if self.queue:
-            if 0 < index < len(self.queue):
-                promoted_track = self.queue.pop(index)
-                self.queue = [promoted_track] + self.queue
-                return f"Promoted {promoted_track[0]} to the top of the queue."
-            elif 0 == index:
-                raise Exception(f"{self.queue[index][0]} is already at top of queue.")
-            else:
-                raise Exception("Index is outside of queue range.")
-        else:
-            raise Exception("Queue is empty.")
-                
-    def shuffle_queue(self):
-        if self.queue:
-            random.shuffle(self.queue)
-            return "Queue has been shuffled."
-        else:
-            raise Exception("Queue is empty.")
-
-    def add_to_jukebox(self, alias, playlist):
-        jukebox = self.get_jukebox()
-        if alias in jukebox:
-            raise Exception(f"{alias} already exists in the Jukebox.")
-        if len(jukebox) >= 9:
-            raise Exception(f"Jukebox is full. *Maximum of 9 playlists.*")
-        jukebox[alias] = playlist
-        self.save_settings()
-
-    def remove_from_jukebox(self, alias):
-        jukebox = self.get_jukebox()
-        if not alias in jukebox:
-            raise Exception(f"{alias} isn't in the Jukebox.")
-        del jukebox[alias]
-        self.save_settings()
-
-    def get_jukebox(self):
-        return self.settings['playlists']
-
-    def toggle_loop(self):
-        if self.settings['loop']:
-            self.settings['loop'] = False
-            self.save_settings()
-            return "Disabled looping of the queue."
-        else:
-            self.settings['loop'] = True
-            self.save_settings()
-            return "Enabled looping of the queue."
+        # Other modules are intended to put their settings here. Eg. cogs.music
 
     def set_prefix(self, prefix):
         self.settings['prefix'] = prefix
@@ -172,6 +103,10 @@ async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
     print(f"Logged in as {bot.user}")
 
+    # Load saved server configs & sets status
+    initialize_servers()
+    await update_status()
+
     # Scan for & load cog modules
     cogs = []
     cogsDir = os.listdir("cogs")
@@ -185,10 +120,6 @@ async def on_ready():
         except Exception as e:
             print(f"Failed to load extension {cog}.", file=sys.stderr)
             traceback.print_exc()
-
-    # Load saved server configs & sets status
-    initialize_servers()
-    await update_status()
 
 @bot.event
 async def on_guild_join(guild):
