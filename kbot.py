@@ -200,15 +200,6 @@ async def on_guild_join(guild):
         bot.server_data[guild.id].load_settings()
     await update_status()
 
-@bot.command()
-@commands.is_owner()
-async def reload(ctx, extension):
-    try:
-        await bot.reload_extension(extension)
-        await ctx.send(f"Reloaded extension `{extension}`")
-    except Exception as e:
-        await ctx.send(f"Failed to reload extension `{extension}`: `{e}`")
-
 def main():
     bot.run(config["discord_token"], log_handler=handler)
 

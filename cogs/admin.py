@@ -21,6 +21,16 @@ class Admin(commands.Cog):
         else:
             await ctx.send(f"An error occurred: `{str(error)}`")
 
+    @commands.command()
+    @commands.is_owner()
+    async def reload(self, ctx, extension):
+        """Reloads a specified module"""
+        try:
+            await self.bot.reload_extension(extension)
+            await ctx.send(f"Reloaded extension `{extension}`")
+        except Exception as e:
+            await ctx.send(f"Failed to reload extension `{extension}`: `{e}`")
+
 async def setup(bot):
     print("Loading Admin extension...")
     await bot.add_cog(Admin(bot))
