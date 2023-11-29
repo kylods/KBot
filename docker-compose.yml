@@ -1,0 +1,9 @@
+version: '3'
+services:
+  kbot:
+    build: .
+    image: kbot:latest
+    volumes:
+      - kbot-servers:/servers
+volumes:
+  kbot-servers:
