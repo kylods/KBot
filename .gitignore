@@ -4,3 +4,5 @@ downloads/
 __pycache__/
 CHANGELOG.md
 .env
+cogs/__pycache__/
+cogs/debug.py

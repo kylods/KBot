@@ -174,12 +174,22 @@ async def update_status():
 async def on_ready():
     """Runs when the bot has initialized and authenticated with Discord."""
     print(f"Logged in as {bot.user}")
-    for cog in ["cogs.general", "cogs.admin", "cogs.music"]:
+
+    # Scan for & load cog modules
+    cogs = []
+    cogsDir = os.listdir("cogs")
+    for file in cogsDir:
+        if file.endswith(".py"):
+            cogs.append("cogs." + file[:-3])    
+
+    for cog in cogs:
         try:
             await bot.load_extension(cog)
         except Exception as e:
             print(f"Failed to load extension {cog}.", file=sys.stderr)
             traceback.print_exc()
+
+    # Load saved server configs & sets status
     initialize_servers()
     await update_status()
 

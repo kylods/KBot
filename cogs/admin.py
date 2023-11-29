@@ -7,6 +7,7 @@ class Admin(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def sync(self, ctx):
+        """Owner only"""
         await self.bot.tree.sync()
         await ctx.send("Synced command tree to Discord.")
 
