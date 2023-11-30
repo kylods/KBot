@@ -18,8 +18,10 @@ def load_config():
         
     }
 
-    if (not config['default_prefix'] or
-    not config['discord_token']):
+    if not config['default_prefix']:
+        config['default_prefix'] = "!"
+
+    if not config['discord_token']:
         print("Environment variable(s) empty.")
         exit()
 

@@ -6,3 +6,4 @@ CHANGELOG.md
 .env
 cogs/__pycache__/
 cogs/debug.py
+docker-compose.yml
