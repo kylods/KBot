@@ -4,6 +4,6 @@ services:
     build: .
     image: kbot:latest
     volumes:
-      - kbot-servers:/servers
+      - servers:/servers
 volumes:
-  kbot-servers:
+  servers:
