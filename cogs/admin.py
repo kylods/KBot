@@ -18,8 +18,12 @@ class Admin(commands.Cog):
 
         if isinstance(error, commands.NotOwner):
             await ctx.send("This command is reserved for ***High Exarch Kuelos***")
+
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send("Missing arguments. Use `/help (command)` for command usage.")
+
         else:
-            await ctx.send(f"An error occurred: `{str(error)}`")
+            await ctx.send(f"An unhandled error occurred. Ping Kuelos about this one. \n `{str(error.__class__.__name__)}`: `{str(error)}`")
 
     @commands.command()
     @commands.is_owner()
