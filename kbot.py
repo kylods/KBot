@@ -1,7 +1,6 @@
 import os
 import logging
 import json
-import random
 import sys
 import traceback
 from dotenv import load_dotenv
