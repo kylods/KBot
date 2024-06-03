@@ -621,7 +621,8 @@ async def _play_next_song(ctx, bot):
     if not song_info:
         # Queue is empty, so clear now playing.
         server_queue.now_playing = {}
-
+        return
+    
     title = song_info['title']
     if song_info['track_type'] == 'spotify':
         url = _get_youtube_url(song_info['title'])
